@@ -8,7 +8,7 @@ from lda import train
 
 docs, vocab = vectorize_docs(load_line_corpus('data/nips-2014.dat'))
 
-K = 20
+K = 10
 V = len(vocab)
 
 # initialize alpha
