@@ -12,53 +12,13 @@ K = 4
 V = len(vocab)
 
 # initialize alpha
-# alpha = np.random.rand(K) * 2
 alpha = np.ones(K)
 alpha /= alpha.size
-print(alpha)
+
 
 ################
 # Initialize beta
-# My own method
-################
-
-# add some prior on the topics
-topic_words = [['bandit', 'regret'],
-               ['infer', 'exponenti'],
-               ['neural', 'network'],
-               ['algorithm']]
-
-vocab_inv = {w: i
-             for i, w in vocab.items()}
-
-beta1 = np.zeros((K, V), dtype=np.float64)
-for k in xrange(K):
-    ids = [vocab_inv[w] for w in topic_words[k]]
-    if len(ids) > 0:
-        beta1[k, ids] = 1. / len(ids)
-
-words = np.concatenate(docs)
-
-beta2 = np.zeros(V, dtype=np.float64)
-
-counter = Counter(words)
-for id_, c in counter.items():
-    beta2[id_] = c + 0.1
-
-beta2 /= (len(words) + 0.1 * len(counter))
-
-beta2 = np.random.rand(K, V)
-beta2 /= beta2.sum(axis=1)[:, None]
-
-beta = 0.2 * beta1 + 0.8 * beta2
-
-# Pure random sampling
-beta = np.random.rand(K, V)
-beta /= beta.sum(axis=1)[:, None]
-
-################
-# Initialize beta
-# Seeded method
+# Seeded method proposed by the paper
 ################
 
 beta = np.zeros((K, V))
