@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 
-from scipy.special import (psi, polygamma, gamma)
+from scipy.special import (psi, polygamma, gamma, gammaln)
 
 from util import close_enough
 
@@ -17,6 +17,7 @@ def init_ips(M, K, alpha, docs):
 def e_step_one_iter(alpha, beta, docs, phi, ips):
     M, K = docs.size, alpha.size
 
+
     for m in xrange(M):
         N_m = docs[m].size
         psi_sum_ips = psi(ips[m, :].sum())
@@ -26,18 +27,16 @@ def e_step_one_iter(alpha, beta, docs, phi, ips):
                 phi[m][n, i] = (beta[i, docs[m][n]] *
                                 np.exp(E_q))
         phi[m] /= phi[m].sum(axis=1)[:, None]  # normalize phi
-        ips[m, :] = alpha + phi[m].sum(axis=0)
+        ips[m] = alpha + phi[m].sum(axis=0)
+
 
     # gradient computation
     grad_ips = np.zeros(ips.shape, dtype=np.float64)
     for m in xrange(M):
         for i in xrange(K):
-            # print("{}+ {} - {} = {}".format(alpha[i], phi[m][:, i].sum(), ips[m, i],
-            #                                 alpha[i] + phi[m][:, i].sum() - ips[m, i]))
             grad_ips[m, i]\
                 = (polygamma(1, ips[m, i]) * (alpha[i] + phi[m][:, i].sum() - ips[m, i]) -
                    polygamma(1, ips[m, :].sum()) * (alpha.sum() + phi[m].sum() - ips[m, :].sum()))
-            # print(grad_ips[m, i])
 
     return (phi, ips, grad_ips)
 
@@ -65,7 +64,7 @@ def e_step(alpha, beta, docs):
     while True:
         phi, ips, grad_ips = e_step_one_iter(alpha, beta,
                                              docs, phi, ips)
-
+        
         # check for convergence
         if np.abs(grad_ips).max() <= 1e-5:
             break
@@ -160,11 +159,13 @@ def lower_bound(ips, phi, alpha, beta, docs, V):
 
     # it will be reused later
     psi_ips_2d = (psi(ips) - psi(ips.sum(axis=1))[:, None])
-    
+        
     # 1st line
-    ret += M * (np.log(gamma(alpha.sum())) - np.log(gamma(alpha)).sum())
+    ret += M * (gammaln(alpha.sum()) - gammaln(alpha).sum())
     ret += np.sum((alpha - 1) * psi_ips_2d)
     
+    assert not np.isinf(ret) and not np.isnan(ret), '1st line'
+
     # 2nd line
     for m in xrange(M):
         ret += np.sum(
@@ -172,26 +173,40 @@ def lower_bound(ips, phi, alpha, beta, docs, V):
              np.asmatrix(psi_ips_2d[m, :].reshape(K, 1)))
         )
     
+    assert not np.isinf(ret) and not np.isnan(ret), '2nd line'
+
     # 3rd line
     for m in xrange(M):
         for n in xrange(docs[m].size):
             for i in xrange(K):
                 ret += phi[m][n, i] * np.log(beta[i, docs[m][n]])
 
+    assert not np.isinf(ret) and not np.isnan(ret), '3rd line'
+
     # 4th line
     # 1st term
-    ret -= np.sum(np.log(gamma(ips.sum(axis=1))))
+    tmp = np.sum(gammaln(ips.sum(axis=1)))
+
+    ret -= np.sum(gammaln(ips.sum(axis=1)))
+
+    assert not np.isinf(ret) and not np.isnan(ret), '4th line, 1st term'
 
     # 2nd term
-    ret += np.log(gamma(ips)).sum()
+    ret += gammaln(ips).sum()
     
+    assert not np.isinf(ret) and not np.isnan(ret), '4th line, 2nd term'
+
     # 3rd term
     ret -= np.sum((ips - 1) * psi_ips_2d)
-    
+
+    assert not np.isinf(ret) and not np.isnan(ret), '4th line, 3rd term'
+
     # 5th line
     for m in xrange(M):
         ret -= np.sum(phi[m] * np.log(phi[m]))
     
+    assert not np.isinf(ret) and not np.isnan(ret), '5th line'
+
     return ret
 
 
@@ -232,7 +247,7 @@ def train(docs, alpha, beta, K, V, max_iter):
         # maximize the lower bound
         # in terms of ips and phi
         ips, phi = e_step(alpha, beta, docs)
-        
+
         # M step
         # maximize the lower bound
         # in terms of alpha and beta
@@ -247,10 +262,9 @@ def train(docs, alpha, beta, K, V, max_iter):
         lower_bound_values.append(new_lower_bound_value)
         
         i += 1
-        print "At iter {}, lower bound %".format(i, new_lower_bound_value)
+        print "At iter {:3d}, lower bound {}".format(i, new_lower_bound_value)
         if i == max_iter:
             break
-
 
     return (alpha, beta, ips, phi, lower_bound_values)
 
