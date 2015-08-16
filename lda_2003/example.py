@@ -8,7 +8,7 @@ from lda import train
 
 docs, vocab = vectorize_docs(load_line_corpus('data/nips-2014.dat'))
 
-K = 4
+K = 20
 V = len(vocab)
 
 # initialize alpha
@@ -38,7 +38,7 @@ assert np.abs(beta.sum(axis=1) - np.ones(K)).max() < 1e-5,\
     beta.sum(axis=1)
 
 (alpha, beta, ips, phi, lower_bound_values)\
-    = train(docs, alpha, beta, K, V, max_iter=500)
+    = train(docs, alpha, beta, K, V, max_iter=50)
 
 for i in xrange(K):
     words = [vocab[id_] for id_ in np.argsort(beta[i])[::-1][:10]]
