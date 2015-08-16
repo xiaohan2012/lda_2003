@@ -1,0 +1,2 @@
+Thus the product AB is defined only if the number of columns. The figure to the right illustrates diagrammatically the product of two matrices A.
+Note AB and BA are two different matrices: the first is a 1 × 1 matrix while the second is a 3 × 3 matrix.
