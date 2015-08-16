@@ -4,6 +4,8 @@ import codecs
 import nltk
 import numpy as np
 
+from sklearn.feature_extraction.text import CountVectorizer
+
 CURDIR = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -60,6 +62,7 @@ def vectorize_docs(docs):
     """
     Parameter:
     --------
+    docs: list of list of str
     
     Return:
     ------
@@ -83,5 +86,20 @@ def vectorize_docs(docs):
                                dtype=np.int64))
     
     return (np.array(data, dtype=np.object), vocab)
+    
+    
+def doc2term_matrix(docs):
+    """
+    Parameter:
+    --------
+    docs: list of list of str
+    
+    Return:
+    ------
+    numpy.ndarray
+    """
+    vect = CountVectorizer(min_df=1)
+    return vect.fit_transform([' '.join(doc)
+                               for doc in docs])
     
     

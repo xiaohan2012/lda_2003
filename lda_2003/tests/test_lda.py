@@ -102,7 +102,8 @@ def test_e_step_one_iter():
     for i in xrange(1):
         phi, ips, grad_ips = e_step_one_iter(alpha, beta,
                                              docs, phi, ips)
-        
+        print(grad_ips)
+
     assert_true(np.abs(grad_ips).max() <= 1e-5)
         
 

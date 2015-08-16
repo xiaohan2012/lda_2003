@@ -2,7 +2,8 @@ import os
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
-from lda_2003.util import (close_enough, load_line_corpus, vectorize_docs)
+from lda_2003.util import (close_enough, load_line_corpus,
+                           vectorize_docs, doc2term_matrix)
 
 from nose.tools import (assert_true, assert_false, assert_equal)
 
@@ -50,3 +51,8 @@ def test_vectorize_docs():
     for doc, doc_m in zip(docs, mat):
         assert_equal([vocab[w] for w in doc_m], doc)
         
+
+def test_doc2term_matrix():
+    docs = load_line_corpus(CURDIR + '/data/corpus.txt')
+    mat = doc2term_matrix(docs)
+    assert_equal(mat.shape, (2, 14))
