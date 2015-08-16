@@ -2,7 +2,7 @@ from __future__ import division
 
 import numpy as np
 
-from scipy.special import (psi, polygamma)
+from scipy.special import (psi, polygamma, gamma)
 
 from util import close_enough
 
@@ -15,7 +15,7 @@ def init_ips(M, K, alpha, docs):
 
 
 def e_step_one_iter(alpha, beta, docs, phi, ips):
-    M, K = docs.size, alpha.size                                        
+    M, K = docs.size, alpha.size
 
     for m in xrange(M):
         N_m = docs[m].size
@@ -37,7 +37,7 @@ def e_step_one_iter(alpha, beta, docs, phi, ips):
             grad_ips[m, i]\
                 = (polygamma(1, ips[m, i]) * (alpha[i] + phi[m][:, i].sum() - ips[m, i]) -
                    polygamma(1, ips[m, :].sum()) * (alpha.sum() + phi[m].sum() - ips[m, :].sum()))
-            print(grad_ips[m, i])
+            # print(grad_ips[m, i])
 
     return (phi, ips, grad_ips)
 
@@ -101,13 +101,12 @@ def gradient_g(M, alpha, ips):
 
 
 def hessian_h_and_z(M, alpha):
-    h = M * polygamma(1, alpha)
-    z = - polygamma(1, alpha.sum())
+    h = - M * polygamma(1, alpha)
+    z = M * polygamma(1, alpha.sum())
     return h, z
 
 
 def update_alpha(M, ips, alpha):
-    # Unsolved
     old_alpha = alpha
 
     max_iter = 10
@@ -117,13 +116,13 @@ def update_alpha(M, ips, alpha):
         if iter >= max_iter:
             break
 
-        print old_alpha
+        # print old_alpha
         g = gradient_g(M, old_alpha, ips)
         h, z = hessian_h_and_z(M, old_alpha)
 
-        print 'g:', g
-        print 'h:', h
-        print
+        # print 'g:', g
+        # print 'h:', h
+        # print
 
         c = (g / h).sum() / (1./z + (1./h).sum())
         
@@ -137,7 +136,7 @@ def update_alpha(M, ips, alpha):
     return new_alpha
     
 
-def m_step(ips, phi, docs, V):
+def m_step(ips, phi, alpha, docs, V):
     """
     Parameter:
     -------------
@@ -148,12 +147,55 @@ def m_step(ips, phi, docs, V):
 
     """
     M, K = ips.shape
-    beta = update_beta(K, M, docs, phi)
-    alpha = update_alpha(K, ips)
+    beta = update_beta(K, M, V, docs, phi)
+    alpha = update_alpha(M, ips, alpha)
     return alpha, beta
     
 
-def train(docs, alpha, beta, K, V):
+def lower_bound(ips, phi, alpha, beta, docs, V):
+    K = ips.shape[1]
+    M = docs.size
+
+    ret = 0
+
+    # it will be reused later
+    psi_ips_2d = (psi(ips) - psi(ips.sum(axis=1))[:, None])
+    
+    # 1st line
+    ret += M * (np.log(gamma(alpha.sum())) - np.log(gamma(alpha)).sum())
+    ret += np.sum((alpha - 1) * psi_ips_2d)
+    
+    # 2nd line
+    for m in xrange(M):
+        ret += np.sum(
+            (np.asmatrix(phi[m]) *
+             np.asmatrix(psi_ips_2d[m, :].reshape(K, 1)))
+        )
+    
+    # 3rd line
+    for m in xrange(M):
+        for n in xrange(docs[m].size):
+            for i in xrange(K):
+                ret += phi[m][n, i] * np.log(beta[i, docs[m][n]])
+
+    # 4th line
+    # 1st term
+    ret -= np.sum(np.log(gamma(ips.sum(axis=1))))
+
+    # 2nd term
+    ret += np.log(gamma(ips)).sum()
+    
+    # 3rd term
+    ret -= np.sum((ips - 1) * psi_ips_2d)
+    
+    # 5th line
+    for m in xrange(M):
+        ret -= np.sum(phi[m] * np.log(phi[m]))
+    
+    return ret
+
+
+def train(docs, alpha, beta, K, V, max_iter):
     """
     Parameter:
     --------------
@@ -166,19 +208,26 @@ def train(docs, alpha, beta, K, V):
     beta: K x V matrix
         topc midels, intial value is passed
     """
-    M, V = docs.shape
+    M = docs.size
     # variational Dirichet parameter
     # which generates theta
     # M x K matrix
     ips = np.zeros((M, K), dtype=np.float64)
-    
-    # variational multinomial parameter
-    # which generates z
-    # M x K matrix
-    phi = np.zeros((M, K), dtype=np.float64)
 
-    converge = False
-    while converge:
+    # variational Multinomial parameter
+    # for each document and each word in the document
+    # will be set during the training
+    # shape: (M, N_m, K)
+    phi = None
+
+    # this ensures the while test passes at the first time
+    old_lower_bound_value = 1000
+    new_lower_bound_value = 0
+    
+    lower_bound_values = []
+
+    i = 0
+    while True:
         # E step
         # maximize the lower bound
         # in terms of ips and phi
@@ -187,7 +236,23 @@ def train(docs, alpha, beta, K, V):
         # M step
         # maximize the lower bound
         # in terms of alpha and beta
-        alpha, beta = m_step(ips, phi, docs)
+        alpha, beta = m_step(ips, phi, alpha, docs, V)
+                
+        if (np.abs(new_lower_bound_value - old_lower_bound_value) <= 1e-3):
+            break
+
+        old_lower_bound_value = new_lower_bound_value
+        new_lower_bound_value = lower_bound(ips, phi, alpha, beta, docs, V)
+
+        lower_bound_values.append(new_lower_bound_value)
+        
+        i += 1
+        print "At iter {}, lower bound %".format(i, new_lower_bound_value)
+        if i == max_iter:
+            break
+
+
+    return (alpha, beta, ips, phi, lower_bound_values)
 
 
 if __name__ == "__main__":
@@ -204,14 +269,18 @@ if __name__ == "__main__":
                      [.3, .1, .2, .2, .1, .1]])
     beta = np.random.random((K, V))
     beta /= beta.sum(axis=1)[:, None]
-    print(beta)
+
     ips = init_ips(M, K, alpha, docs)
+    update_alpha(M, ips, alpha)
+
+    # print(beta)
+    # ips = init_ips(M, K, alpha, docs)
         
-    phi = np.array([np.zeros((docs[m].size, K), dtype=np.float64)
-                    for m in xrange(M)],
-                   dtype=np.object)
+    # phi = np.array([np.zeros((docs[m].size, K), dtype=np.float64)
+    #                 for m in xrange(M)],
+    #                dtype=np.object)
     
-    for i in xrange(1):
-        phi, ips, grad_ips = e_step_one_iter(alpha, beta,
-                                             docs, phi, ips)
-        print grad_ips
+    # for i in xrange(1):
+    #     phi, ips, grad_ips = e_step_one_iter(alpha, beta,
+    #                                          docs, phi, ips)
+    #     print grad_ips

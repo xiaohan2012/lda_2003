@@ -1,7 +1,7 @@
 import numpy as np
 
 from numpy.testing import assert_array_almost_equal
-from nose.tools import assert_true
+from nose.tools import (assert_true, assert_equal)
 
 from scipy.special import (psi, polygamma)
 
@@ -11,7 +11,10 @@ from lda_2003.lda import (init_ips,
                           update_alpha,
                           update_beta,
                           e_step,
-                          e_step_one_iter)
+                          e_step_one_iter,
+                          lower_bound,
+                          m_step,
+                          train)
 
 
 M = 3
@@ -65,9 +68,9 @@ def test_hessian_h_and_z():
     h, z = hessian_h_and_z(M, alpha)
     for i in xrange(alpha.size):
         actual = h[i]
-        expected = M * polygamma(1, alpha[i])
+        expected = - M * polygamma(1, alpha[i])
         assert_array_almost_equal(actual, expected)
-    assert_array_almost_equal(z, - polygamma(1, alpha.sum()))
+    assert_array_almost_equal(z, M * polygamma(1, alpha.sum()))
 
 
 def test_update_alpha():
@@ -75,8 +78,7 @@ def test_update_alpha():
     
     new_alpha = update_alpha(M, ips, alpha)
 
-    # should be close to zeros
-
+    # gradient should be close to zeros after convergence
     assert_array_almost_equal(gradient_g(M, new_alpha, ips),
                               np.zeros(new_alpha.shape))
 
@@ -116,3 +118,61 @@ def test_e_step():
     for m in xrange(phi.size):
         assert_array_almost_equal(phi[m].sum(axis=1), 1)
 
+    # make sure the lower bound increases
+    old_lb_val = lower_bound(old_ips, phi, alpha, beta, docs, V)
+    new_ips, new_phi = e_step(alpha, beta, docs)
+    new_lb_val = lower_bound(new_ips, new_phi, alpha, beta, docs, V)
+
+    assert_true(new_lb_val >= old_lb_val)
+
+
+def test_m_step():
+    # make sure that the lower bound increases
+    ips = init_ips(M, K, alpha, docs)
+    alpha_ = alpha
+    old_lb_val = lower_bound(ips, phi, alpha, beta, docs, V)
+
+    alpha_, beta_ = m_step(ips, phi, alpha, docs, V)
+    new_lb_val = lower_bound(ips, phi, alpha_, beta_, docs, V)
+    
+    assert_true(new_lb_val >= old_lb_val)
+
+
+def test_lower_bound():
+    ips = init_ips(M, K, alpha, docs)
+    actual = lower_bound(ips, phi, alpha, beta, docs, V)
+
+    # how to test if we don't want to calculate by hand
+    # 1st, <= 0
+    assert_true(actual <= 0)
+
+    # 2nd, after training several iterations
+    # the value should be increasing
+    # as our goal is to maximize the lower bound
+    old_lb_val = actual
+    alpha_, beta_ = alpha, beta
+    ips_, phi_ = ips, phi
+    for i in xrange(10):
+        ips_, phi_ = e_step(alpha_, beta_, docs)
+        alpha_, beta_ = m_step(ips_, phi_, alpha_, docs, V)
+
+        new_lb_val = lower_bound(ips_, phi_, alpha_, beta_, docs, V)
+        assert_true(new_lb_val >= old_lb_val)
+
+        old_lb_val = new_lb_val
+
+
+def test_train():
+    alpha_, beta_, ips_, phi_, lower_bound_values\
+        = train(docs, alpha, beta, K, V, max_iter=50)
+
+    # some dimensionality checking
+    assert_equal(alpha_.shape, (K, ))
+    assert_equal(beta_.shape, (K, V))
+    assert_equal(ips_.shape, (M, K))
+
+    for m in xrange(M):
+        assert_equal(phi_[m].shape, (docs[m].size, K))
+
+    for prev, cur in zip(lower_bound_values, lower_bound_values[1:]):
+        assert_true(prev <= cur)
