@@ -50,9 +50,38 @@ def load_line_corpus(path):
             tokenized_sents = map(nltk.word_tokenize, sents)
             doc = [stemmer.stem(word.lower())
                    for sent in tokenized_sents
-                   for word in sent if word not in stopwords]
+                   for word in sent if word not in stopwords and len(word) > 2]
             docs.append(doc)
 
     return docs
 
 
+def vectorize_docs(docs):
+    """
+    Parameter:
+    --------
+    
+    Return:
+    ------
+    matrix: numpy.ndarray
+    vocab: dict(id -> str)
+    """
+    word_set = set()
+    for doc in docs:
+        for w in doc:
+            word_set.add(w)
+
+    vocab = {i: w
+             for i, w in enumerate(word_set)}
+    vocab_inv = {w: i
+                 for i, w in enumerate(word_set)}
+
+    data = []
+    for doc in docs:
+        data.append(np.asarray([vocab_inv[w]
+                                for w in doc],
+                               dtype=np.int64))
+    
+    return (np.array(data, dtype=np.object), vocab)
+    
+    
