@@ -1,6 +1,10 @@
 # lda_2003
 Python Implementation of "Latent Dirichlet Allocation, David, Blei, 2003"
 
+# Example
+
+Topics on NIPS 2014(only abstracts) are modeled. Please refer to `example.py`
+
 # What is ready
 
 - Estimation algorithm implementation
