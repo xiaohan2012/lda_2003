@@ -12,4 +12,4 @@ Python Implementation of "Latent Dirichlet Allocation, David, Blei, 2003"
 
 # WARNING
 
-It's still unknown whether the estimation implementation is correct or not, though tests have been written and the the increase of lower bound can be seen during training.
+It's still unknown whether the estimation implementation is correct or not, though tests have been written and the increase of lower bound can be seen during training.
