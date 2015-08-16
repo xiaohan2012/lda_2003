@@ -3,6 +3,7 @@ import codecs
 
 import nltk
 import numpy as np
+from collections import Counter
 
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -102,4 +103,20 @@ def doc2term_matrix(docs):
     return vect.fit_transform([' '.join(doc)
                                for doc in docs])
     
+
+def convert_to_lda_c_format(docs, output_path):
+    """
+    docs: list of list of str
     
+    """
+    with codecs.open(output_path, 'w', 'utf8') as f:
+        for doc in docs:
+            M = len(set(doc))
+            term_count_str = [u"{}:{}".format(t, c)
+                              for t, c in Counter(doc).items()]
+            f.write(u"{} {}\n".format(M, ' '.join(term_count_str)))
+            
+
+if __name__ == "__main__":
+    docs = load_line_corpus('data/nips-2014.dat')
+    convert_to_lda_c_format(docs, 'data/nips-2014-lda-c.dat')

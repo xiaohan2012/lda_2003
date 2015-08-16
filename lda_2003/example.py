@@ -12,10 +12,16 @@ K = 4
 V = len(vocab)
 
 # initialize alpha
-alpha = np.random.rand(K) * 2
+# alpha = np.random.rand(K) * 2
+alpha = np.ones(K)
+alpha /= alpha.size
+print(alpha)
 
+################
+# Initialize beta
+# My own method
+################
 
-# initialize beta
 # add some prior on the topics
 topic_words = [['bandit', 'regret'],
                ['infer', 'exponenti'],
@@ -46,12 +52,33 @@ beta2 /= beta2.sum(axis=1)[:, None]
 
 beta = 0.2 * beta1 + 0.8 * beta2
 
+# Pure random sampling
+beta = np.random.rand(K, V)
+beta /= beta.sum(axis=1)[:, None]
+
+################
+# Initialize beta
+# Seeded method
+################
+
+beta = np.zeros((K, V))
+
+n_sample_doc = 2
+doc_ids = np.random.permutation(docs.size)[: n_sample_doc * K]
+for i in xrange(K):
+    ids = doc_ids[n_sample_doc * i: n_sample_doc * (i+1)]
+    words = np.concatenate(docs[ids])
+    counter = Counter(words)
+    for id_, c in counter.items():
+        beta[i, id_] = c + 0.1
+    beta[i] += (np.random.rand(V) * 0.2)
+    beta[i] /= beta[i].sum()
 
 assert np.abs(beta.sum(axis=1) - np.ones(K)).max() < 1e-5,\
     beta.sum(axis=1)
 
 (alpha, beta, ips, phi, lower_bound_values)\
-    = train(docs, alpha, beta, K, V, max_iter=100)
+    = train(docs, alpha, beta, K, V, max_iter=500)
 
 for i in xrange(K):
     words = [vocab[id_] for id_ in np.argsort(beta[i])[::-1][:10]]
